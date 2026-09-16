@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVN-AI · Choose your year</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="shell" style="background:var(--paper)">
+  <div id="topnav-mount"></div>
+
+  <div class="page-wrap">
+    <div class="page-inner">
+      <div class="page-kicker">STEP 1 OF 2</div>
+      <h1 class="page-title">Which year and branch?</h1>
+      <p class="page-lede">Pick these once — SVN-AI will work out the exact subject from whatever you ask next, so you never have to hunt through a subject list.</p>
+
+      <div class="choice-block">
+        <div class="choice-label">YEAR</div>
+        <div class="choice-row" id="year-row"></div>
+      </div>
+
+      <div class="choice-block">
+        <div class="choice-label">BRANCH</div>
+        <div class="choice-row" id="branch-row"></div>
+      </div>
+
+      <div class="continue-row">
+        <button class="btn btn-ink" id="continue-btn" disabled onclick="goAsk()">Continue to Ask →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+renderTopnav('select');
+
+let year = null, branch = null;
+const prior = getScope();
+if(prior){ year = prior.year; branch = prior.branch; }
+
+function buildYearRow(){
+  const row = document.getElementById('year-row');
+  row.innerHTML = '';
+  Object.keys(CURRICULUM).forEach(y=>{
+    const c = document.createElement('div');
+    c.className = 'choice-card' + (y===year ? ' active' : '');
+    c.innerHTML = '<b>'+y+'</b><span>'+CURRICULUM[y].branches.length+' branch(es) available</span>';
+    c.onclick = ()=>{ year=y; branch=null; buildYearRow(); buildBranchRow(); updateContinue(); };
+    row.appendChild(c);
+  });
+}
+
+function buildBranchRow(){
+  const row = document.getElementById('branch-row');
+  row.innerHTML = '';
+  if(!year){ row.innerHTML = '<span style="color:var(--ink-soft);font-size:13.5px">Select a year first</span>'; return; }
+  CURRICULUM[year].branches.forEach(b=>{
+    const c = document.createElement('div');
+    c.className = 'choice-card' + (b===branch ? ' active' : '');
+    c.innerHTML = '<b>'+b+'</b><span>'+CURRICULUM[year].subjects[b].length+' subjects</span>';
+    c.onclick = ()=>{ branch=b; buildBranchRow(); updateContinue(); };
+    row.appendChild(c);
+  });
+}
+
+function updateContinue(){
+  document.getElementById('continue-btn').disabled = !(year && branch);
+}
+
+function goAsk(){
+  if(!year || !branch) return;
+  saveScope(year, branch);
+  window.location.href = 'ask.html';
+}
+
+buildYearRow();
+buildBranchRow();
+updateContinue();
+</script>
+</body>
+</html>

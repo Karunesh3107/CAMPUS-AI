@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVN-AI · Log in</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="shell grain-bg">
+  <div class="shell auth-page">
+    <div class="auth-card">
+      <div class="auth-hero">
+        <div>
+          <div class="eyebrow">SVN COLLEGE OF ENGINEERING</div>
+          <h1 class="hero-title">SVN-AI</h1>
+          <p class="hero-copy">Ask any question from your syllabus and get a full, exam-ready answer — written the way your paper expects it.</p>
+          <div class="hero-stats">
+            <div><b>22</b><span>SUBJECTS COVERED</span></div>
+            <div><b>7</b><span>MARK-STYLE ANSWERS</span></div>
+            <div><b>3</b><span>WAYS TO ASK</span></div>
+          </div>
+        </div>
+        <div class="hero-foot">Type it, photograph it, or scan it with your camera — SVN-AI works out the subject on its own.</div>
+      </div>
+
+      <div class="auth-form-side">
+        <h2>Welcome back</h2>
+        <p class="sub">Log in with your student ID to continue.</p>
+        <div class="field">
+          <label for="login-id">Student ID</label>
+          <input id="login-id" type="text" autocomplete="username" placeholder="e.g. svn2024cs041">
+        </div>
+        <div class="field">
+          <label for="login-pass">Password</label>
+          <input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button class="btn btn-ink btn-block" onclick="handleLogin()">Log in</button>
+        <div class="errline" id="login-err"></div>
+        <div class="switchline">New here? <a href="signup.html">Create a student account</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+if(getSession()){ window.location.href = 'select.html'; }
+
+function showErr(msg){
+  const el = document.getElementById('login-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function handleLogin(){
+  const id = document.getElementById('login-id').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  if(!id || !pass){ showErr('Enter your student ID and password.'); return; }
+  try{
+    let rec = null;
+    try{ rec = await window.storage.get('student:'+id, true); }catch(e){ rec = null; }
+    if(!rec){ showErr('No account found with that student ID.'); return; }
+    const data = JSON.parse(rec.value);
+    const passHash = await hashPass(pass);
+    if(data.passHash !== passHash){ showErr('Incorrect password.'); return; }
+    saveSession({ id: data.id, name: data.name });
+    window.location.href = 'select.html';
+  }catch(e){
+    showErr('Could not log in right now. Please try again.');
+  }
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){ handleLogin(); }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVN-AI · Ask a question</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="shell" style="background:var(--paper)">
+  <div id="topnav-mount"></div>
+
+  <div class="page-wrap">
+    <div class="page-inner">
+      <div class="page-kicker">STEP 2 OF 2</div>
+      <h1 class="page-title">Ask your question</h1>
+      <p class="page-lede">Type it, attach a photo, or use your camera. SVN-AI reads it, works out which subject it belongs to, and writes a full 7-mark answer.</p>
+
+      <div class="ask-scope" id="scope-line"></div>
+
+      <div id="qa-list"></div>
+      <div class="empty-hint" id="empty-hint">
+        Nothing asked yet — your first question will appear here along with the answer.
+      </div>
+
+      <div class="compose-card">
+        <div id="attach-preview-wrap"></div>
+        <div class="compose-row">
+          <button class="icon-btn" title="Upload image" onclick="document.getElementById('file-input').click()">📎</button>
+          <button class="icon-btn" title="Use camera" onclick="openCamera()">📷</button>
+          <input type="file" id="file-input" accept="image/*" style="display:none" onchange="onFileChosen(event)">
+          <textarea id="q-input" placeholder="Type your question… e.g. 'Explain Newton's laws of motion' (7 marks)"></textarea>
+          <button class="btn btn-ink send-btn" id="send-btn" onclick="submitQuestion()">Ask</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cam-modal">
+  <div class="cam-box">
+    <video id="cam-video" autoplay playsinline></video>
+    <canvas id="cam-canvas" style="display:none"></canvas>
+    <div class="cam-actions">
+      <button class="btn btn-brass" onclick="capturePhoto()">Capture</button>
+      <button class="btn btn-outline" style="background:#fff" onclick="closeCamera()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+requireAuth();
+renderTopnav('ask');
+
+const scope = getScope();
+if(!scope){ window.location.href = 'select.html'; }
+
+document.getElementById('scope-line').innerHTML =
+  '<span>Asking as <b>'+scope.year+' · '+scope.branch+'</b></span><a href="select.html">Change</a>';
+
+let pendingImage = null;
+let camStream = null;
+
+function onFileChosen(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> setPendingImage(reader.result, file.type);
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function setPendingImage(dataUrl, mediaType){
+  pendingImage = { dataUrl, base64: dataUrl.split(',')[1], mediaType };
+  const wrap = document.getElementById('attach-preview-wrap');
+  wrap.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'attach-preview';
+  row.innerHTML = '<img src="'+dataUrl+'"><span>Question image attached</span>';
+  const rm = document.createElement('button');
+  rm.textContent = 'Remove';
+  rm.onclick = ()=>{ pendingImage=null; wrap.innerHTML=''; };
+  row.appendChild(rm);
+  wrap.appendChild(row);
+}
+
+async function openCamera(){
+  document.getElementById('cam-modal').classList.add('active');
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('cam-video').srcObject = camStream;
+  }catch(e){
+    alert('Could not access camera: ' + e.message);
+    closeCamera();
+  }
+}
+function closeCamera(){
+  document.getElementById('cam-modal').classList.remove('active');
+  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+}
+function capturePhoto(){
+  const video = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  setPendingImage(canvas.toDataURL('image/jpeg', 0.9), 'image/jpeg');
+  closeCamera();
+}
+
+async function submitQuestion(){
+  const input = document.getElementById('q-input');
+  const text = input.value.trim();
+  if(!text && !pendingImage){ alert('Type a question or attach an image of it.'); return; }
+
+  document.getElementById('empty-hint').style.display = 'none';
+  const list = document.getElementById('qa-list');
+
+  const block = document.createElement('div');
+  block.className = 'qa-block';
+
+  const meta = document.createElement('div');
+  meta.className = 'q-meta';
+  meta.textContent = new Date().toLocaleTimeString();
+  block.appendChild(meta);
+
+  const qBubble = document.createElement('div');
+  qBubble.className = 'q-bubble';
+  qBubble.innerHTML = escapeHtml(text || '(question sent as image)');
+  if(pendingImage){
+    const img = document.createElement('img');
+    img.src = pendingImage.dataUrl;
+    qBubble.appendChild(img);
+  }
+  block.appendChild(qBubble);
+
+  const loading = document.createElement('div');
+  loading.className = 'loading-card';
+  loading.innerHTML = '<div class="spin"></div><span>Reading the question and working out a 7-mark answer…</span>';
+  block.appendChild(loading);
+
+  list.appendChild(block);
+
+  const imgToSend = pendingImage;
+  input.value = '';
+  pendingImage = null;
+  document.getElementById('attach-preview-wrap').innerHTML = '';
+  document.getElementById('send-btn').disabled = true;
+
+  try{
+    const { detected, answer } = await askClaudeAutoDetect(scope, text, imgToSend);
+    block.removeChild(loading);
+    const tag = document.createElement('div');
+    tag.className = 'detect-tag';
+    tag.innerHTML = '<span class="dot"></span> Detected: '+escapeHtml(detected);
+    block.appendChild(tag);
+    const card = document.createElement('div');
+    card.className = 'a-card';
+    card.innerHTML = '<h3>7-MARK ANSWER</h3><div class="a-body">'+renderAnswer(answer)+'</div>';
+    block.appendChild(card);
+  }catch(e){
+    block.removeChild(loading);
+    const card = document.createElement('div');
+    card.className = 'a-card';
+    card.style.borderLeftColor = '#9c3f2e';
+    card.innerHTML = '<h3 style="color:#9c3f2e">COULD NOT GENERATE ANSWER</h3><div class="a-body"><p>'+escapeHtml(e.message || 'Something went wrong. Please try again.')+'</p></div>';
+    block.appendChild(card);
+  } finally {
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.target && e.target.id === 'q-input' && e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    submitQuestion();
+  }
+});
+</script>
+</body>
+</html>

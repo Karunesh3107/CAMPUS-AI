@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVN-AI · Create account</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="shell grain-bg">
+  <div class="shell auth-page">
+    <div class="auth-card">
+      <div class="auth-hero">
+        <div>
+          <div class="eyebrow">SVN COLLEGE OF ENGINEERING</div>
+          <h1 class="hero-title">Join SVN-AI</h1>
+          <p class="hero-copy">One account gets you every subject from 1st and 2nd year — no need to search which book covers which topic.</p>
+        </div>
+        <div class="hero-foot">Your ID and password stay on this account only.</div>
+      </div>
+
+      <div class="auth-form-side">
+        <h2>Create your account</h2>
+        <p class="sub">Takes less than a minute.</p>
+        <div class="field">
+          <label for="su-name">Full name</label>
+          <input id="su-name" type="text" placeholder="Your name">
+        </div>
+        <div class="field">
+          <label for="su-id">Choose a student ID</label>
+          <input id="su-id" type="text" placeholder="e.g. svn2024cs041">
+        </div>
+        <div class="field">
+          <label for="su-pass">Choose a password</label>
+          <input id="su-pass" type="password" placeholder="••••••••">
+        </div>
+        <button class="btn btn-brass btn-block" onclick="handleSignup()">Create account</button>
+        <div class="errline" id="signup-err"></div>
+        <div class="switchline">Already registered? <a href="index.html">Log in instead</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/app.js"></script>
+<script>
+if(getSession()){ window.location.href = 'select.html'; }
+
+function showErr(msg){
+  const el = document.getElementById('signup-err');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function handleSignup(){
+  const name = document.getElementById('su-name').value.trim();
+  const id = document.getElementById('su-id').value.trim().toLowerCase();
+  const pass = document.getElementById('su-pass').value;
+  if(!name || !id || !pass){ showErr('Please fill in every field.'); return; }
+  if(pass.length < 4){ showErr('Password should be at least 4 characters.'); return; }
+
+  try{
+    let existing = null;
+    try{ existing = await window.storage.get('student:'+id, true); }catch(e){ existing = null; }
+    if(existing){ showErr('That student ID is already registered. Try logging in.'); return; }
+
+    const passHash = await hashPass(pass);
+    await window.storage.set('student:'+id, JSON.stringify({ name, id, passHash }), true);
+    saveSession({ id, name });
+    window.location.href = 'select.html';
+  }catch(e){
+    showErr('Could not create account right now. Please try again.');
+  }
+}
+</script>
+</body>
+</html>
